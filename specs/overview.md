@@ -258,6 +258,115 @@ The agent ends every run by calling a `submit_report` tool whose input schema is
 }
 ```
 
+**Example report.** A concrete, valid report for the schema above. The tests validate it against the exported JSON Schema (`specs/report.schema.json`), so keep it valid.
+
+```json
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_20261025_0914_checkout",
+  "alert_ids": [
+    "alt_checkout_error_rate_0914"
+  ],
+  "summary": "Checkout v2.14.0 exhausted its database connection pool; roll back to v2.13.2.",
+  "impact": {
+    "services": [
+      "checkout"
+    ],
+    "user_facing": true,
+    "severity": "critical"
+  },
+  "timing": {
+    "alert_fired_at": "2026-10-25T09:14:00Z",
+    "impact_started_at": "2026-10-25T09:06:30Z",
+    "impact_ended_at": null,
+    "peak_at": "2026-10-25T09:12:10Z",
+    "detection_lag_s": 450,
+    "investigation_window": {
+      "from": "2026-10-25T08:36:30Z",
+      "to": "2026-10-25T09:16:00Z"
+    },
+    "report_generated_at": "2026-10-25T09:16:40Z"
+  },
+  "timeline": [
+    {
+      "at": "2026-10-25T09:05:52Z",
+      "event": "Deploy checkout v2.14.0 (commit a1b2c3d)",
+      "source": "changes",
+      "link": "https://github.com/org/checkout/deployments/123"
+    },
+    {
+      "at": "2026-10-25T09:06:30Z",
+      "event": "First 'connection pool exhausted' error",
+      "source": "logs",
+      "link": "https://kibana.example.com/app/discover#/doc/abc123"
+    },
+    {
+      "at": "2026-10-25T09:12:10Z",
+      "event": "Error rate peaks at 18%",
+      "source": "metrics",
+      "link": "https://kibana.example.com/app/apm/services/checkout"
+    },
+    {
+      "at": "2026-10-25T09:14:00Z",
+      "event": "Alert fired",
+      "source": "alert",
+      "link": null
+    }
+  ],
+  "root_cause": {
+    "category": "deploy",
+    "description": "v2.14.0 lowered the database pool size from 50 to 5, so requests queue and time out under normal load.",
+    "confidence": "high",
+    "confidence_reason": null,
+    "suspected_change_id": "deploy-123",
+    "onset_relative_to_change_s": 38
+  },
+  "evidence": [
+    {
+      "source": "changes",
+      "claim": "checkout v2.14.0 deployed 38 s before the first pool error",
+      "ref": "deploy-123",
+      "observed_at": "2026-10-25T09:05:52Z",
+      "window": {
+        "from": "2026-10-25T08:36:30Z",
+        "to": "2026-10-25T09:14:00Z"
+      },
+      "link": "https://github.com/org/checkout/deployments/123"
+    },
+    {
+      "source": "logs",
+      "claim": "'connection pool exhausted' errors start at 09:06:30",
+      "ref": "log-abc123",
+      "observed_at": "2026-10-25T09:06:30Z",
+      "window": {
+        "from": "2026-10-25T09:00:00Z",
+        "to": "2026-10-25T09:16:00Z"
+      },
+      "link": "https://kibana.example.com/app/discover#/doc/abc123"
+    }
+  ],
+  "ruled_out": [
+    {
+      "hypothesis": "Database outage",
+      "reason": "Database latency and error rate were flat during the incident."
+    }
+  ],
+  "suggested_next_steps": [
+    "Roll back checkout to v2.13.2",
+    "Restore db.pool.size to 50 in the Helm values"
+  ],
+  "stats": {
+    "model": "claude-sonnet-5-5",
+    "tool_calls": 9,
+    "input_tokens": 61000,
+    "cached_input_tokens": 42000,
+    "output_tokens": 2100,
+    "cost_usd": 0.21,
+    "duration_s": 142
+  }
+}
+```
+
 The report is per incident, not per alert: `alert_ids` lists every grouped alert. `schema_version` lets notifiers and evals handle future changes, and `confidence_reason` makes a low-confidence report explain itself.
 
 Every `evidence.ref` must point to something a tool actually returned in this run. The eval harness checks this, which catches hallucinated log lines.

@@ -77,6 +77,7 @@ flowchart LR
 | Agent interface | `tools/` | MCP servers with stable tool names; output formatting and size caps | REQ-PRV-02, 05, 06 |
 | Integration | `providers/` | Protocols, registry, middleware and vendor adapters | REQ-PRV-01, 03, 04, 07..11 |
 | Output | `notifiers/` | Routing, Slack and email adapters, retries, threaded updates, responder feedback | REQ-RPT-02..07, 09 |
+| Shared models | `models/` | Core Pydantic models and the exported Report JSON Schema; imports nothing else from the package | REQ-PRV-03, REQ-RPT-01 |
 | Cross-cutting | `config/`, `observability/` | Settings schema and loader; tracing and transcripts | REQ-PRV-01, REQ-AGT-09, 10 |
 | Quality | `evals/`, `tests/` | Eval cases, fixtures and graders; unit, contract, integration and load tests | NFR-01..03, 12 |
 
@@ -98,6 +99,7 @@ unbreak_ai/
 │   └── changes/     github.py
 ├── notifiers/       base.py · router.py · slack.py · email.py · feedback.py
 ├── config/          schema.py · loader.py
+├── models/          common.py · alert.py · incident.py · logs.py · report.py
 └── observability/   tracing.py · transcripts.py
 evals/               cases/ · fixtures/ · graders/ · runner.py
 tests/               unit/ · contract/ · integration/ · load/
@@ -107,6 +109,7 @@ specs/               overview.md · requirements.md · design.md · tasks.md
 **Rules that keep it simple**
 
 - Dependencies point one way: `agent` → `tools` → `providers`. `providers` never imports `agent` or `tools`; CI enforces this with import-linter.
+- `models/` is the lowest layer: it holds the shared Pydantic models and imports nothing else from `unbreak_ai`. import-linter enforces this too.
 - Adding a vendor means one new file in `providers/<interface>/`, one registry entry, and a passing contract suite. Nothing else changes.
 - Adding a notification channel means one new file in `notifiers/` and a passing notifier contract suite.
 
@@ -169,12 +172,12 @@ class Notifier(Protocol):
 
 ## Data models
 
-All models are Pydantic, all timestamps are timezone-aware UTC, and every provider-returned model carries `source` (provider name) and `link` [REQ-PRV-03, 05].
+All models are Pydantic, all timestamps are timezone-aware UTC (naive datetimes are rejected and other offsets are normalized to UTC), and every provider-returned model carries `source` (provider name) and `link` [REQ-PRV-03, 05].
 
 | Model | Key fields | Notes |
 | --- | --- | --- |
 | `Alert` | `id`, `fingerprint`, `source`, `name`, `severity` (critical/warning/info), `service`, `namespace`, `labels`, `annotations`, `starts_at`, `ends_at`, `status` (firing/resolved), `expr` (the alert's query, when the source provides one) | Normalized from each alert source in `intake/` |
-| `Incident` | `id`, `state` (open/investigating/reported/resolved), `severity`, `alerts`, `grouping_reasons`, `created_at`, `updated_at`, `report`, `deliveries`, `feedback` | Severity = highest of its alerts |
+| `Incident` | `id`, `state` (open/investigating/reported/resolved), `severity`, `alerts`, `grouping_reasons`, `created_at`, `updated_at`, `report` (optional until reported), `deliveries`, `feedback` | Severity = highest of its alerts |
 | `LogRecord` | `ref`, `timestamp`, `level` (lowercase), `service`, `namespace`, `pod`, `message` (≤ 500 chars in lists), `trace_id`, `source`, `link` | `ref` is opaque to the agent and round-trips to `get` / `context` |
 | `LogOverview` | `histogram` (time buckets → count), `top_levels`, `top_services`, `top_pods`, `total` | Counts only, no messages |
 | `ErrorPattern` | `pattern`, `count`, `first_seen`, `last_seen`, `services`, `sample_ref` | Pattern normalization as in elk_mcp-server |
@@ -185,8 +188,12 @@ All models are Pydantic, all timestamps are timezone-aware UTC, and every provid
 | `ErrorGroup` | `group_key`, `message`, `count`, `first_seen`, `last_seen`, `sample_trace_id` | |
 | `ChangeEvent` | `id`, `kind` (deploy/config), `service`, `at`, `author`, `summary`, `version`, `link` | GitHub provider: deploys from the Deployments API when the repo uses it, else merges to the default branch; config changes are commits touching configured paths, such as Helm values |
 | `DiffSummary` | `change_id`, `commits`, `files` (≤ 30, path + lines changed), `link` | |
-| `Report` | As in the report schema in overview.md | Validated in `agent/report.py` [REQ-RPT-01] |
-| `DeliveryRef` | `notifier`, `channel`, `message_id`, `thread_id`, `delivered_at`, `status` | Used for follow-up updates [REQ-RPT-07] |
+| `LogQuery` | `level`, `text` | Both optional; the filter part of `logs_search` |
+| `Page[T]` | `items`, `next_cursor` | `next_cursor` is `None` on the last page |
+| `GroupingReason` | `alert_id`, `rule` (fingerprint/scope/dependency), `detail` | Why an alert joined an incident [REQ-INT-03..05] |
+| `Feedback` | `verdict` (correct/incorrect), `by`, `at`, `comment` | Responder feedback on a report [REQ-RPT-09] |
+| `Report` | As in the report schema in overview.md | Defined in `models/report.py`; its JSON Schema is exported to `specs/report.schema.json`; validated in `agent/report.py` [REQ-RPT-01]. `confidence_reason` is required when confidence is `low`; the timeline is sorted oldest first and includes the alert |
+| `DeliveryRef` | `notifier`, `channel`, `message_id`, `thread_id`, `delivered_at`, `status` (delivered/failed) | Used for follow-up updates [REQ-RPT-07] |
 
 ## Agent tool contracts
 
