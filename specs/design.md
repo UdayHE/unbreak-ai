@@ -215,6 +215,20 @@ The only surface the agent sees. Names and inputs never change between providers
 
 One YAML file, validated at startup by a Pydantic model; `${VAR}` values are read from the environment, and secrets may only come from there [REQ-PRV-01, NFR-09]. overview.md has a full example.
 
+`config.example.yaml` at the repo root is the canonical example and is loaded by a test, so it cannot drift from the schema. Connection settings come from the environment: a field marked *secret* is valid only when its YAML value is a `${VAR}` reference with no default, so inline and defaulted secrets are rejected. `${VAR:-default}` is allowed for non-secret values only.
+
+**Per-type settings (v1)**
+
+| Type | Required settings | Optional settings |
+| --- | --- | --- |
+| logs / `elasticsearch` | `url`, `api_key` (secret) | `regions[]`, `max_qps` |
+| metrics / `elastic_apm` | `url`, `api_key` (secret) | `max_qps` |
+| metrics / `prometheus` | `url` | `auth` (secret), `max_qps` |
+| traces / `elastic_apm` | `url`, `api_key` (secret) | `max_qps` |
+| changes / `github` | `token` (secret), `repos[]` (≥ 1) | `config_paths[]`, `max_qps` |
+| notifiers / `slack` | `channel`, `bot_token` (secret) | `routing`, `display_timezone` |
+| notifiers / `email` | `to[]` (≥ 1), `smtp_url` (secret) | `routing`, `display_timezone` |
+
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `alert_source.type` | enum: alertmanager | alertmanager | Later: pagerduty, opsgenie, grafana, elastic |

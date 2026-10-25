@@ -114,26 +114,42 @@ Every external system sits behind a provider interface, so swapping ELK for Sumo
 ```yaml
 alert_source:
   type: alertmanager
+  auth: ${ALERTMANAGER_TOKEN}
 providers:
   logs:
     - type: elasticsearch
+      url: ${ELASTICSEARCH_URL}
+      api_key: ${ELASTICSEARCH_API_KEY}
       regions: [ap-south-1, us-east-1]
   metrics:
     - type: elastic_apm
+      url: ${ELASTICSEARCH_URL}
+      api_key: ${ELASTICSEARCH_API_KEY}
     - type: prometheus
       url: ${PROMETHEUS_URL}
   traces:
     - type: elastic_apm
+      url: ${ELASTICSEARCH_URL}
+      api_key: ${ELASTICSEARCH_API_KEY}
   changes:
     - type: github
+      token: ${GITHUB_TOKEN}
       repos: [org/checkout, org/payments]
 notifiers:
   - type: slack
     channel: "#incidents"
-    min_severity: warning
+    bot_token: ${SLACK_BOT_TOKEN}
+    routing:
+      min_severity: warning
   - type: email
     to: [oncall@example.com]
-    min_severity: critical
+    smtp_url: ${SMTP_URL}
+    routing:
+      min_severity: critical
+agent:
+  model: claude-sonnet-5-5
+redis_url: ${REDIS_URL}
+database_url: ${DATABASE_URL}
 ```
 
 Stretch goal: a second logs provider (Grafana Loki is the easiest to run locally). A second adapter is what proves the interface is genuinely provider-neutral.

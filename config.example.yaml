@@ -1,0 +1,38 @@
+alert_source:
+  type: alertmanager
+  auth: ${ALERTMANAGER_TOKEN}
+providers:
+  logs:
+    - type: elasticsearch
+      url: ${ELASTICSEARCH_URL}
+      api_key: ${ELASTICSEARCH_API_KEY}
+      regions: [ap-south-1, us-east-1]
+  metrics:
+    - type: elastic_apm
+      url: ${ELASTICSEARCH_URL}
+      api_key: ${ELASTICSEARCH_API_KEY}
+    - type: prometheus
+      url: ${PROMETHEUS_URL}
+  traces:
+    - type: elastic_apm
+      url: ${ELASTICSEARCH_URL}
+      api_key: ${ELASTICSEARCH_API_KEY}
+  changes:
+    - type: github
+      token: ${GITHUB_TOKEN}
+      repos: [org/checkout, org/payments]
+notifiers:
+  - type: slack
+    channel: "#incidents"
+    bot_token: ${SLACK_BOT_TOKEN}
+    routing:
+      min_severity: warning
+  - type: email
+    to: [oncall@example.com]
+    smtp_url: ${SMTP_URL}
+    routing:
+      min_severity: critical
+agent:
+  model: claude-sonnet-5-5
+redis_url: ${REDIS_URL}
+database_url: ${DATABASE_URL}
