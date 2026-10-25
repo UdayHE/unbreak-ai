@@ -5,7 +5,6 @@ import pytest
 import yaml
 
 from unbreak_ai.config.loader import UnbreakAIConfigError, load_config
-from unbreak_ai.config.schema import Severity
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config.example.yaml"
@@ -46,8 +45,8 @@ def test_example_config_is_valid_with_defaults() -> None:
     assert cfg.providers.logs[0].type == "elasticsearch"
     assert [m.type for m in cfg.providers.metrics] == ["elastic_apm", "prometheus"]
     assert cfg.providers.logs[0].max_qps == 5
-    assert cfg.notifiers[0].routing.min_severity is Severity.WARNING
-    assert cfg.notifiers[1].routing.min_severity is Severity.CRITICAL
+    assert cfg.notifiers[0].routing.min_severity == "warning"
+    assert cfg.notifiers[1].routing.min_severity == "critical"
     assert cfg.notifiers[0].display_timezone == "UTC"
     assert cfg.agent.limits.max_tool_calls == 15
     assert cfg.agent.limits.max_input_tokens == 150000
@@ -57,7 +56,7 @@ def test_example_config_is_valid_with_defaults() -> None:
     assert cfg.incidents.grouping_window_s == 300
     assert cfg.incidents.workers == 5
     assert cfg.incidents.dependency_map == "apm"
-    assert cfg.incidents.ignore.min_severity is Severity.INFO
+    assert cfg.incidents.ignore.min_severity == "info"
     assert cfg.incidents.ignore.flappers == []
     assert len(cfg.redaction.patterns) == 3
     assert cfg.retention_days == 30

@@ -1,11 +1,12 @@
 """Settings schema: one Pydantic model for the whole YAML config (design.md, Config schema)."""
 
 import re
-from enum import StrEnum
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+
+from unbreak_ai.models.common import Severity
 
 Secret = Annotated[SecretStr, Field(min_length=1)]
 
@@ -14,12 +15,6 @@ DEFAULT_REDACTION_PATTERNS = [
     r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+",
     r"AKIA[0-9A-Z]{16}",
 ]
-
-
-class Severity(StrEnum):
-    INFO = "info"
-    WARNING = "warning"
-    CRITICAL = "critical"
 
 
 class _Model(BaseModel):
@@ -84,7 +79,7 @@ class ProvidersConfig(_Model):
 
 
 class Routing(_Model):
-    min_severity: Severity = Severity.WARNING
+    min_severity: Severity = "warning"
     services: list[str] | None = None  # None means all services
 
 
@@ -131,7 +126,7 @@ class AgentConfig(_Model):
 
 
 class IgnoreRules(_Model):
-    min_severity: Severity = Severity.INFO
+    min_severity: Severity = "info"
     flappers: list[str] = []
 
 
