@@ -34,3 +34,12 @@ Not yet published. When released: `pip install unbreak-ai`, then `import unbreak
 ## License
 
 [Apache 2.0](LICENSE)
+
+## Development
+
+```sh
+uv sync
+uv run pytest
+```
+
+See `CLAUDE.md` for the full check list.
