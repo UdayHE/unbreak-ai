@@ -13,7 +13,7 @@ Ordered, PR-sized tasks. Each lists the requirements it satisfies and a "done wh
 ## Phase 1: Foundations and logs provider (weeks 1–2)
 
 - [x] **T-01 Repo scaffold.** uv project with the design.md package layout, ruff, mypy, pytest, import-linter and GitHub Actions. *Reqs:* NFR-12. *Done when:* CI is green, and a deliberate `providers` → `agent` import fails the build.
-- [ ] **T-02 Config schema and loader.** Pydantic model per design.md, `${VAR}` interpolation, startup validation. *Reqs:* REQ-PRV-01, NFR-09. *Done when:* tests cover a valid config, an unknown type, a missing setting and a secret read from env.
+- [x] **T-02 Config schema and loader.** Pydantic model per design.md, `${VAR}` interpolation, startup validation. *Reqs:* REQ-PRV-01, NFR-09. *Done when:* tests cover a valid config, an unknown type, a missing setting and a secret read from env.
 - [ ] **T-03 Core models.** `Alert`, `Incident`, `TimeWindow`, `Scope`, log models and `Report`, plus JSON Schema export for `Report`. *Reqs:* REQ-PRV-03, REQ-RPT-01. *Done when:* round-trip tests pass and the exported schema validates the example report in overview.md.
 - [ ] **T-04 Provider Protocols, errors and registry.** *Reqs:* REQ-PRV-01, 04. *Done when:* the registry builds a fake provider from config and rejects an unknown type with a clear error.
 - [ ] **T-05 Provider middleware.** Rate limit, 60 s TTL cache with time-window rounding, circuit breaker, redaction; state kept in memory behind an interface so Redis can replace it in T-31. *Reqs:* REQ-PRV-07..09, NFR-10. *Done when:* unit tests with a fake clock cover breaker open, half-open and close, cache hits and redaction of each default pattern.
