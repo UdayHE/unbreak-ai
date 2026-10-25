@@ -91,16 +91,17 @@ unbreak_ai/
 ├── tools/           logs_server.py · metrics_server.py · changes_server.py · descriptions.py
 ├── providers/
 │   ├── base.py      Protocols, errors, capabilities
-│   ├── registry.py  builds providers from config
+│   ├── registry.py  the known provider types (explicit mapping) and their factories
 │   ├── middleware/  rate_limit.py · cache.py · breaker.py · redact.py
 │   ├── logs/        elasticsearch.py
 │   ├── metrics/     elastic_apm.py · prometheus.py
 │   ├── traces/      elastic_apm.py
 │   └── changes/     github.py
-├── notifiers/       base.py · router.py · slack.py · email.py · feedback.py
-├── config/          schema.py · loader.py
+├── notifiers/       base.py · registry.py · router.py · slack.py · email.py · feedback.py
+├── config/          schema.py · loader.py · registry.py
 ├── models/          common.py · alert.py · incident.py · logs.py · report.py
 └── observability/   tracing.py · transcripts.py
+startup.py           composition root: load_app_config, default registries, build_providers
 evals/               cases/ · fixtures/ · graders/ · runner.py
 tests/               unit/ · contract/ · integration/ · load/
 specs/               overview.md · requirements.md · design.md · tasks.md
@@ -172,6 +173,8 @@ class Notifier(Protocol):
 
 ## Data models
 
+**Provisional.** `Metric`, `ServiceHealth`, `Series`, `Mover`, `TraceSummary`, `ErrorGroup`, `ChangeEvent`, `DiffSummary` and their parts are defined now only so the provider Protocols type-check (T-04). T-21 to T-25 may refine them through spec-fix commits.
+
 All models are Pydantic, all timestamps are timezone-aware UTC (naive datetimes are rejected and other offsets are normalized to UTC), and every provider-returned model carries `source` (provider name) and `link` [REQ-PRV-03, 05].
 
 | Model | Key fields | Notes |
@@ -181,13 +184,14 @@ All models are Pydantic, all timestamps are timezone-aware UTC (naive datetimes 
 | `LogRecord` | `ref`, `timestamp`, `level` (lowercase), `service`, `namespace`, `pod`, `message` (≤ 500 chars in lists), `trace_id`, `source`, `link` | `ref` is opaque to the agent and round-trips to `get` / `context` |
 | `LogOverview` | `histogram` (time buckets → count), `top_levels`, `top_services`, `top_pods`, `total` | Counts only, no messages |
 | `ErrorPattern` | `pattern`, `count`, `first_seen`, `last_seen`, `services`, `sample_ref` | Pattern normalization as in elk_mcp-server |
-| `ServiceHealth` | `service`, `window`, `baseline`, `latency_p95_ms`, `throughput_rpm`, `error_rate`, `deltas`, per-value `source` | Baseline defaults to the same window 24 h earlier |
-| `Series` | `signal`, `points` (≤ 60 after resampling), `threshold`, `unit` | |
-| `Mover` | `entity`, `signal`, `baseline_value`, `current_value`, `change_pct` | Sorted by absolute change |
-| `TraceSummary` | `trace_id`, `root_service`, `duration_ms`, `spans` (≤ 20: slowest and failed), `link` | |
-| `ErrorGroup` | `group_key`, `message`, `count`, `first_seen`, `last_seen`, `sample_trace_id` | |
-| `ChangeEvent` | `id`, `kind` (deploy/config), `service`, `at`, `author`, `summary`, `version`, `link` | GitHub provider: deploys from the Deployments API when the repo uses it, else merges to the default branch; config changes are commits touching configured paths, such as Helm values |
-| `DiffSummary` | `change_id`, `commits`, `files` (≤ 30, path + lines changed), `link` | |
+| `Metric` | `name`, `unit`, `value`, `baseline`, `delta_pct`, `source` | One signal compared with its baseline, labeled with the provider it came from [REQ-PRV-10] |
+| `ServiceHealth` | `service`, `window`, `baseline_window`, `latency_p95_ms`, `throughput_rpm`, `error_rate` (each a `Metric`), `extra` (list of `Metric` for infrastructure signals such as CPU, memory and restarts), `source`, `link` | Baseline defaults to the same window 24 h earlier |
+| `Series` | `signal`, `points` (list of `Point`: `at`, `value`; ≤ 60 after resampling), `threshold`, `unit`, `source`, `link` | |
+| `Mover` | `entity`, `signal`, `baseline_value`, `current_value`, `change_pct`, `source`, `link` | Sorted by absolute change |
+| `TraceSummary` | `trace_id`, `root_service`, `duration_ms`, `spans` (list of `SpanSummary`: `span_id`, `service`, `name`, `duration_ms`, `status` ok/error; ≤ 20: slowest and failed), `source`, `link` | |
+| `ErrorGroup` | `group_key`, `message`, `count`, `first_seen`, `last_seen`, `sample_trace_id`, `source`, `link` | |
+| `ChangeEvent` | `id`, `kind` (deploy/config), `service`, `at`, `author`, `summary`, `version`, `source`, `link` | GitHub provider: deploys from the Deployments API when the repo uses it, else merges to the default branch; config changes are commits touching configured paths, such as Helm values |
+| `DiffSummary` | `change_id`, `commits` (list of `Commit`: `sha`, `author`, `message`), `files` (list of `FileChange`: `path`, `additions`, `deletions`; ≤ 30), `source`, `link` | |
 | `LogQuery` | `level`, `text` | Both optional; the filter part of `logs_search` |
 | `Page[T]` | `items`, `next_cursor` | `next_cursor` is `None` on the last page |
 | `GroupingReason` | `alert_id`, `rule` (fingerprint/scope/dependency), `detail` | Why an alert joined an incident [REQ-INT-03..05] |
@@ -222,6 +226,10 @@ The only surface the agent sees. Names and inputs never change between providers
 
 One YAML file, validated at startup by a Pydantic model; `${VAR}` values are read from the environment, and secrets may only come from there [REQ-PRV-01, NFR-09]. overview.md has a full example.
 
+Provider and notifier entries are `{type, ...settings}`. The config module accepts the `type` string and does not know which types exist. Each family has a registry, an explicit mapping from type name to its settings model and factory, in `providers/registry.py` and `notifiers/registry.py`. These registries are the single source of truth for known types, so adding a vendor never touches `config/`. A settings model lives next to its adapter (for example `providers/logs/elasticsearch.py`).
+
+**Startup.** `startup.load_app_config()` is the one entry point. It reads the YAML, interpolates `${VAR}`, validates the schema, parses every provider and notifier entry through its registry, and applies the secret rule to every field of type `SecretStr` found by walking the settings models (nested models and lists included), not from a list of field names. It raises one `UnbreakAIConfigError` listing every problem with its full key path, before any provider is built. `startup.build_providers()` then builds the providers. `config/` never imports `providers/` or `notifiers/`, and nothing imports `startup`.
+
 `config.example.yaml` at the repo root is the canonical example and is loaded by a test, so it cannot drift from the schema. Connection settings come from the environment: a field marked *secret* is valid only when its YAML value is a `${VAR}` reference with no default, so inline and defaulted secrets are rejected. `${VAR:-default}` is allowed for non-secret values only.
 
 **Per-type settings (v1)**
@@ -240,7 +248,7 @@ One YAML file, validated at startup by a Pydantic model; `${VAR}` values are rea
 | --- | --- | --- | --- |
 | `alert_source.type` | enum: alertmanager | alertmanager | Later: pagerduty, opsgenie, grafana, elastic |
 | `alert_source.auth` | secret | required | Bearer token, basic auth or HMAC secret, depending on the source [REQ-INT-01] |
-| `providers.logs[]` | list of `{type, ...settings}` | required, ≥ 1 | v1 type: elasticsearch |
+| `providers.logs[]` | list of `{type, ...settings}` | required, ≥ 1 | v1 type: elasticsearch; types come from the registry |
 | `providers.metrics[]` | list | optional | v1 types: elastic_apm, prometheus |
 | `providers.traces[]` | list | optional | v1 type: elastic_apm |
 | `providers.changes[]` | list | optional | v1 type: github |
