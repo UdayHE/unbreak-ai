@@ -4,7 +4,8 @@ from typing import Any
 import pytest
 import yaml
 
-from unbreak_ai.config.loader import UnbreakAIConfigError, load_config
+from unbreak_ai.config.loader import UnbreakAIConfigError
+from unbreak_ai.startup import load_app_config as load_config
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config.example.yaml"
@@ -48,18 +49,18 @@ def test_example_config_is_valid_with_defaults() -> None:
     assert cfg.notifiers[0].routing.min_severity == "warning"
     assert cfg.notifiers[1].routing.min_severity == "critical"
     assert cfg.notifiers[0].display_timezone == "UTC"
-    assert cfg.agent.limits.max_tool_calls == 15
-    assert cfg.agent.limits.max_input_tokens == 150000
-    assert cfg.agent.limits.timeout_s == 240
-    assert cfg.agent.daily_budget_usd == 25
-    assert cfg.agent.prompt_caching is True
-    assert cfg.incidents.grouping_window_s == 300
-    assert cfg.incidents.workers == 5
-    assert cfg.incidents.dependency_map == "apm"
-    assert cfg.incidents.ignore.min_severity == "info"
-    assert cfg.incidents.ignore.flappers == []
-    assert len(cfg.redaction.patterns) == 3
-    assert cfg.retention_days == 30
+    assert cfg.config.agent.limits.max_tool_calls == 15
+    assert cfg.config.agent.limits.max_input_tokens == 150000
+    assert cfg.config.agent.limits.timeout_s == 240
+    assert cfg.config.agent.daily_budget_usd == 25
+    assert cfg.config.agent.prompt_caching is True
+    assert cfg.config.incidents.grouping_window_s == 300
+    assert cfg.config.incidents.workers == 5
+    assert cfg.config.incidents.dependency_map == "apm"
+    assert cfg.config.incidents.ignore.min_severity == "info"
+    assert cfg.config.incidents.ignore.flappers == []
+    assert len(cfg.config.redaction.patterns) == 3
+    assert cfg.config.retention_days == 30
 
 
 @pytest.mark.req("REQ-PRV-01")
@@ -67,7 +68,7 @@ def test_dependency_map_defaults_to_none_without_traces_provider(tmp_path: Path)
     data = _base()
     del data["providers"]["traces"]
     cfg = load_config(_write(tmp_path, data), env=ENV)
-    assert cfg.incidents.dependency_map == "none"
+    assert cfg.config.incidents.dependency_map == "none"
 
 
 @pytest.mark.req("REQ-PRV-01")
@@ -138,16 +139,16 @@ def test_env_default_allowed_for_non_secret(tmp_path: Path) -> None:
     env = {k: v for k, v in ENV.items() if k != "PROMETHEUS_URL"}
     cfg = load_config(_write(tmp_path, data), env=env)
     assert cfg.providers.metrics[1].type == "prometheus"
-    assert cfg.providers.metrics[1].url == "http://localhost:9090"
+    assert cfg.providers.metrics[1].model_dump()["url"] == "http://localhost:9090"
 
 
 @pytest.mark.req("NFR-09")
 def test_secret_is_read_from_env_and_hidden(tmp_path: Path) -> None:
     cfg = load_config(_write(tmp_path, _base()), env=ENV)
-    assert cfg.redis_url.get_secret_value() == ENV["REDIS_URL"]
-    assert cfg.alert_source.auth.get_secret_value() == "am-token-value"
-    assert "am-token-value" not in repr(cfg)
-    assert "es-key-value" not in cfg.model_dump_json()
+    assert cfg.config.redis_url.get_secret_value() == ENV["REDIS_URL"]
+    assert cfg.config.alert_source.auth.get_secret_value() == "am-token-value"
+    assert "am-token-value" not in repr(cfg.config) + repr(cfg)
+    assert "es-key-value" not in cfg.config.model_dump_json()
 
 
 @pytest.mark.req("NFR-09")
@@ -189,7 +190,7 @@ def test_secret_from_env_with_bad_value_type_does_not_leak(tmp_path: Path) -> No
 def test_config_path_from_env_variable(tmp_path: Path) -> None:
     path = _write(tmp_path, _base())
     cfg = load_config(env={**ENV, "UNBREAK_AI_CONFIG": str(path)})
-    assert cfg.retention_days == 30
+    assert cfg.config.retention_days == 30
 
 
 @pytest.mark.req("REQ-PRV-01")

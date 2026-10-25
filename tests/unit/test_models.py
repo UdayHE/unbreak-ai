@@ -313,3 +313,37 @@ def test_report_timestamps_must_be_utc() -> None:
     data["timing"]["alert_fired_at"] = "2026-10-25T09:14:00"
     with pytest.raises(ValidationError, match="timezone"):
         Report.model_validate(data)
+
+
+@pytest.mark.req("REQ-PRV-03")
+def test_provider_return_models_round_trip_and_enforce_limits() -> None:
+    from unbreak_ai.models.changes import ChangeEvent, Commit, DiffSummary, FileChange
+    from unbreak_ai.models.metrics import Metric, Point, Series
+    from unbreak_ai.models.traces import SpanSummary, TraceSummary
+
+    _roundtrip(Series(signal="errors", points=[Point(at=T0, value=1.0)], source="prom"))
+    _roundtrip(Metric(name="cpu", unit="%", value=1, baseline=2, delta_pct=-50, source="apm"))
+    _roundtrip(
+        ChangeEvent(id="d1", kind="deploy", at=T0, summary="deploy", source="github", link=None)
+    )
+    _roundtrip(
+        DiffSummary(
+            change_id="d1",
+            commits=[Commit(sha="a1", message="m")],
+            files=[FileChange(path="a.py", additions=1, deletions=0)],
+            source="github",
+        )
+    )
+    span = SpanSummary(span_id="s", service="x", name="n", duration_ms=1, status="error")
+    _roundtrip(
+        TraceSummary(trace_id="t", root_service="x", duration_ms=1, spans=[span], source="apm")
+    )
+
+    point = Point(at=T0, value=1.0)
+    with pytest.raises(ValidationError):
+        Series(signal="x", points=[point] * 61, source="prom")
+    with pytest.raises(ValidationError):
+        TraceSummary(trace_id="t", root_service="x", duration_ms=1, spans=[span] * 21, source="a")
+    file = FileChange(path="a", additions=0, deletions=0)
+    with pytest.raises(ValidationError):
+        DiffSummary(change_id="d", commits=[], files=[file] * 31, source="g")

@@ -93,3 +93,33 @@ forbidden_modules = [
     "unbreak_ai.providers",
     "unbreak_ai.tools",
 ]
+
+[[tool.importlinter.contracts]]
+name = "config imports no feature module"
+type = "forbidden"
+source_modules = ["unbreak_ai.config"]
+forbidden_modules = [
+    "unbreak_ai.agent",
+    "unbreak_ai.incidents",
+    "unbreak_ai.intake",
+    "unbreak_ai.notifiers",
+    "unbreak_ai.providers",
+    "unbreak_ai.startup",
+    "unbreak_ai.tools",
+]
+
+[[tool.importlinter.contracts]]
+name = "nothing imports startup"
+type = "forbidden"
+source_modules = [
+    "unbreak_ai.agent",
+    "unbreak_ai.config",
+    "unbreak_ai.incidents",
+    "unbreak_ai.intake",
+    "unbreak_ai.models",
+    "unbreak_ai.notifiers",
+    "unbreak_ai.observability",
+    "unbreak_ai.providers",
+    "unbreak_ai.tools",
+]
+forbidden_modules = ["unbreak_ai.startup"]

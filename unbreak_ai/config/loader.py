@@ -8,29 +8,43 @@ Error text is built from each error's location and message only, never the input
 import os
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 from pydantic import BaseModel, SecretStr, ValidationError
 
-from unbreak_ai.config.schema import UnbreakAIConfig
+from unbreak_ai.config.errors import UnbreakAIConfigError
+from unbreak_ai.config.registry import Registries, TypeRegistry
+from unbreak_ai.config.schema import NotifierSettings, ProviderSettings, UnbreakAIConfig
+
+__all__ = ["AppConfig", "ResolvedProviders", "UnbreakAIConfigError", "load_config"]
 
 CONFIG_ENV = "UNBREAK_AI_CONFIG"
 _REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
 
-class UnbreakAIConfigError(Exception):
-    """Raised when the config cannot be loaded; the message lists every problem found."""
+@dataclass(frozen=True)
+class ResolvedProviders:
+    logs: list[ProviderSettings]
+    metrics: list[ProviderSettings]
+    traces: list[ProviderSettings]
+    changes: list[ProviderSettings]
 
-    def __init__(self, problems: list[str]) -> None:
-        self.problems = problems
-        super().__init__("Invalid configuration:\n" + "\n".join(f"  - {p}" for p in problems))
+
+@dataclass(frozen=True)
+class AppConfig:
+    """The validated config plus every provider and notifier entry parsed by its registry."""
+
+    config: UnbreakAIConfig
+    providers: ResolvedProviders
+    notifiers: list[NotifierSettings]
 
 
 def load_config(
-    path: str | Path | None = None, env: Mapping[str, str] | None = None
-) -> UnbreakAIConfig:
+    path: str | Path | None, env: Mapping[str, str] | None, registries: Registries
+) -> AppConfig:
     env = os.environ if env is None else env
     if path is None:
         if not env.get(CONFIG_ENV):
@@ -51,21 +65,68 @@ def load_config(
     if problems:
         raise UnbreakAIConfigError(problems)
 
+    # Report schema problems and entry problems together, each with its full key path.
+    problems = []
+    config: UnbreakAIConfig | None = None
     try:
         config = UnbreakAIConfig.model_validate(data)
     except ValidationError as exc:
-        raise UnbreakAIConfigError(
-            [f"{_dotted(e['loc'])}: {e['msg']}" for e in exc.errors(include_input=False)]
-        ) from None
+        problems.extend(f"{_dotted(e['loc'])}: {e['msg']}" for e in exc.errors(include_input=False))
 
-    bad = [
-        f"{secret_path}: secret must be set as ${{VAR}} from the environment, without a default"
-        for secret_path in _secret_paths(config, "")
-        if secret_path not in env_paths
-    ]
-    if bad:
-        raise UnbreakAIConfigError(bad)
-    return config
+    logs = _parse_entries(
+        registries.logs, _entries(data, "providers", "logs"), "providers.logs", problems
+    )
+    metrics = _parse_entries(
+        registries.metrics, _entries(data, "providers", "metrics"), "providers.metrics", problems
+    )
+    traces = _parse_entries(
+        registries.traces, _entries(data, "providers", "traces"), "providers.traces", problems
+    )
+    changes = _parse_entries(
+        registries.changes, _entries(data, "providers", "changes"), "providers.changes", problems
+    )
+    notifiers = _parse_entries(
+        registries.notifiers, _entries(data, "notifiers"), "notifiers", problems
+    )
+
+    # NFR-09: secrets are found by type (SecretStr), wherever they sit in a settings model.
+    for secret_path in (
+        (_secret_paths(config, "") if config else [])
+        + _secret_paths(logs, "providers.logs")
+        + _secret_paths(metrics, "providers.metrics")
+        + _secret_paths(traces, "providers.traces")
+        + _secret_paths(changes, "providers.changes")
+        + _secret_paths(notifiers, "notifiers")
+    ):
+        if secret_path not in env_paths:
+            problems.append(
+                f"{secret_path}: secret must be set as ${{VAR}} from the environment, "
+                "without a default"
+            )
+    if problems or config is None:
+        raise UnbreakAIConfigError(problems)
+    return AppConfig(config, ResolvedProviders(logs, metrics, traces, changes), notifiers)
+
+
+def _entries(data: dict[str, Any], *keys: str) -> list[Any]:
+    node: Any = data
+    for key in keys:
+        node = node.get(key) if isinstance(node, dict) else None
+    return node if isinstance(node, list) else []
+
+
+def _parse_entries[S: BaseModel](
+    registry: TypeRegistry[S, Any], entries: list[Any], path: str, problems: list[str]
+) -> list[S]:
+    parsed: list[S] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue  # reported by the schema as a malformed list item
+        try:
+            parsed.append(registry.parse(entry, f"{path}.{index}"))
+        except UnbreakAIConfigError as exc:
+            problems.extend(exc.problems)
+    return parsed
 
 
 def _dotted(loc: tuple[int | str, ...]) -> str:
@@ -120,4 +181,6 @@ def _secret_paths(node: object, path: str) -> list[str]:
         ]
     if isinstance(node, list):
         return [p for i, item in enumerate(node) for p in _secret_paths(item, _join(path, i))]
+    if isinstance(node, dict):
+        return [p for key, item in node.items() for p in _secret_paths(item, _join(path, key))]
     return []
