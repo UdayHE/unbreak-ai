@@ -44,3 +44,13 @@ def test_providers_importing_upstream_fails(tmp_path: Path, target: str) -> None
     result = _lint_imports(project)
     assert result.returncode != 0, result.stdout
     assert "BROKEN" in result.stdout
+
+
+@pytest.mark.req("NFR-12")
+@pytest.mark.parametrize("target", ["config", "providers", "agent"])
+def test_models_importing_anything_else_fails(tmp_path: Path, target: str) -> None:
+    project = _copy_project(tmp_path)
+    (project / "unbreak_ai" / "models" / "bad.py").write_text(f"import unbreak_ai.{target}\n")
+    result = _lint_imports(project)
+    assert result.returncode != 0, result.stdout
+    assert "BROKEN" in result.stdout

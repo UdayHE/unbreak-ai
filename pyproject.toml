@@ -14,11 +14,13 @@ dependencies = [
 [dependency-groups]
 dev = [
     "import-linter>=2.1",
+    "jsonschema>=4.26.0",
     "mypy>=1.13",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
     "ruff>=0.8",
+    "types-jsonschema>=4.26.0.20261006",
     "types-pyyaml>=6.0.12.20260906",
 ]
 
@@ -75,4 +77,19 @@ forbidden_modules = [
     "unbreak_ai.incidents",
     "unbreak_ai.intake",
     "unbreak_ai.notifiers",
+]
+
+[[tool.importlinter.contracts]]
+name = "models is the lowest layer"
+type = "forbidden"
+source_modules = ["unbreak_ai.models"]
+forbidden_modules = [
+    "unbreak_ai.agent",
+    "unbreak_ai.config",
+    "unbreak_ai.incidents",
+    "unbreak_ai.intake",
+    "unbreak_ai.notifiers",
+    "unbreak_ai.observability",
+    "unbreak_ai.providers",
+    "unbreak_ai.tools",
 ]

@@ -19,6 +19,7 @@ PACKAGES = [
     "notifiers",
     "config",
     "observability",
+    "models",
 ]
 
 

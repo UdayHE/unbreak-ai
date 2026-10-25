@@ -1,0 +1,443 @@
+{
+  "$defs": {
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": [
+            "logs",
+            "metrics",
+            "traces",
+            "changes"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "claim": {
+          "title": "Claim",
+          "type": "string"
+        },
+        "ref": {
+          "title": "Ref",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/ReportWindow"
+        },
+        "link": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Link"
+        }
+      },
+      "required": [
+        "source",
+        "claim",
+        "ref",
+        "observed_at",
+        "window",
+        "link"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Impact": {
+      "additionalProperties": false,
+      "properties": {
+        "services": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Services",
+          "type": "array"
+        },
+        "user_facing": {
+          "title": "User Facing",
+          "type": "boolean"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "warning",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "services",
+        "user_facing",
+        "severity"
+      ],
+      "title": "Impact",
+      "type": "object"
+    },
+    "ReportWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "format": "date-time",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "format": "date-time",
+          "title": "To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "title": "ReportWindow",
+      "type": "object"
+    },
+    "RootCause": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "deploy",
+            "config",
+            "dependency",
+            "resource",
+            "traffic",
+            "code",
+            "unknown"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "confidence_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "limit_reached",
+                "conflicting_evidence",
+                "insufficient_data"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence Reason"
+        },
+        "suspected_change_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Suspected Change Id"
+        },
+        "onset_relative_to_change_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Onset Relative To Change S"
+        }
+      },
+      "required": [
+        "category",
+        "description",
+        "confidence"
+      ],
+      "title": "RootCause",
+      "type": "object"
+    },
+    "RuledOut": {
+      "additionalProperties": false,
+      "properties": {
+        "hypothesis": {
+          "title": "Hypothesis",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hypothesis",
+        "reason"
+      ],
+      "title": "RuledOut",
+      "type": "object"
+    },
+    "Stats": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "tool_calls": {
+          "minimum": 0,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "cached_input_tokens": {
+          "minimum": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "duration_s": {
+          "minimum": 0,
+          "title": "Duration S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "model",
+        "tool_calls",
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "cost_usd",
+        "duration_s"
+      ],
+      "title": "Stats",
+      "type": "object"
+    },
+    "TimelineEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "logs",
+            "metrics",
+            "traces",
+            "changes",
+            "alert"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "link": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Link"
+        }
+      },
+      "required": [
+        "at",
+        "event",
+        "source",
+        "link"
+      ],
+      "title": "TimelineEntry",
+      "type": "object"
+    },
+    "Timing": {
+      "additionalProperties": false,
+      "properties": {
+        "alert_fired_at": {
+          "format": "date-time",
+          "title": "Alert Fired At",
+          "type": "string"
+        },
+        "impact_started_at": {
+          "format": "date-time",
+          "title": "Impact Started At",
+          "type": "string"
+        },
+        "impact_ended_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Impact Ended At"
+        },
+        "peak_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Peak At"
+        },
+        "detection_lag_s": {
+          "minimum": 0,
+          "title": "Detection Lag S",
+          "type": "integer"
+        },
+        "investigation_window": {
+          "$ref": "#/$defs/ReportWindow"
+        },
+        "report_generated_at": {
+          "format": "date-time",
+          "title": "Report Generated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "alert_fired_at",
+        "impact_started_at",
+        "impact_ended_at",
+        "peak_at",
+        "detection_lag_s",
+        "investigation_window",
+        "report_generated_at"
+      ],
+      "title": "Timing",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "incident_id": {
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "alert_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Alert Ids",
+      "type": "array"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "impact": {
+      "$ref": "#/$defs/Impact"
+    },
+    "timing": {
+      "$ref": "#/$defs/Timing"
+    },
+    "timeline": {
+      "items": {
+        "$ref": "#/$defs/TimelineEntry"
+      },
+      "title": "Timeline",
+      "type": "array"
+    },
+    "root_cause": {
+      "$ref": "#/$defs/RootCause"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "ruled_out": {
+      "items": {
+        "$ref": "#/$defs/RuledOut"
+      },
+      "title": "Ruled Out",
+      "type": "array"
+    },
+    "suggested_next_steps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suggested Next Steps",
+      "type": "array"
+    },
+    "stats": {
+      "$ref": "#/$defs/Stats"
+    }
+  },
+  "required": [
+    "incident_id",
+    "alert_ids",
+    "summary",
+    "impact",
+    "timing",
+    "timeline",
+    "root_cause",
+    "evidence",
+    "ruled_out",
+    "suggested_next_steps",
+    "stats"
+  ],
+  "title": "Report",
+  "type": "object"
+}
