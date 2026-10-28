@@ -127,3 +127,21 @@ class FakeChangesProvider:
 
     async def config_changes(self, service: str | None, window: TimeWindow) -> list[ChangeEvent]:
         return []
+
+
+class FakeClock:
+    """A manually advanced clock; ``sleep`` advances it so rate-limit waits take no real time."""
+
+    def __init__(self, start: float = 1_000_000.0) -> None:
+        self.t = start
+        self.slept: list[float] = []
+
+    def now(self) -> float:
+        return self.t
+
+    def advance(self, seconds: float) -> None:
+        self.t += seconds
+
+    async def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.t += seconds
