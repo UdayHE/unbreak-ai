@@ -92,7 +92,7 @@ unbreak_ai/
 ├── providers/
 │   ├── base.py      Protocols, errors, capabilities
 │   ├── registry.py  the known provider types (explicit mapping) and their factories
-│   ├── middleware/  rate_limit.py · cache.py · breaker.py · redact.py
+│   ├── middleware/  state.py · rate_limit.py · cache.py · breaker.py · redact.py · wrap.py
 │   ├── logs/        elasticsearch.py
 │   ├── metrics/     elastic_apm.py · prometheus.py
 │   ├── traces/      elastic_apm.py
