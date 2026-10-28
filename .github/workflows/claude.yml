@@ -10,8 +10,13 @@ on:
   pull_request_review:
     types: [submitted]
 
+concurrency:
+  group: claude-code
+  cancel-in-progress: false
+
 jobs:
   claude:
+    timeout-minutes: 30
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
@@ -46,5 +51,5 @@ jobs:
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          claude_args: '--max-turns 40'
 

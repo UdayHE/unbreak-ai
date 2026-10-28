@@ -24,3 +24,10 @@ uv run mypy
 uv run lint-imports
 uv run pytest        # includes the 80% coverage gate
 ```
+
+## Automation (Claude Code GitHub Action)
+
+- `@claude plan`: read `specs/`, post the plan as an issue comment, then stop.
+- `@claude implement`: branch `t-xx-short-name`, tests first, implement only that task, tick it in `specs/tasks.md`, open a PR titled `T-xx: <title>` with `Closes #<issue>`, then report the CI result in the PR.
+- Never push directly to `main`. Every change goes through a PR.
+- PRs are reviewed by `/spec-review` (`.claude/skills/spec-review/`).

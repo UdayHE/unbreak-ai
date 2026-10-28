@@ -1,0 +1,36 @@
+name: Task
+description: A task from specs/tasks.md
+labels: [task]
+body:
+  - type: input
+    id: task-id
+    attributes:
+      label: Task id
+      placeholder: T-05
+    validations:
+      required: true
+  - type: textarea
+    id: task-text
+    attributes:
+      label: Task text (from specs/tasks.md)
+    validations:
+      required: true
+  - type: input
+    id: reqs
+    attributes:
+      label: Cited requirement ids
+      placeholder: REQ-PRV-01, REQ-PRV-04
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+    validations:
+      required: true
+  - type: checkboxes
+    id: plan
+    attributes:
+      label: Planning
+      options:
+        - label: Plan required (comment `@claude plan` first)
